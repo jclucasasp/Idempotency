@@ -2,14 +2,12 @@ package com.lucas.banking.service;
 
 import com.lucas.banking.AccountRepository;
 import com.lucas.banking.dto.AccountResponse;
-import com.lucas.banking.dto.DepositRequest;
 import com.lucas.banking.dto.TransferRequest;
 import com.lucas.banking.dto.TransferResponse;
 import com.lucas.banking.model.Account;
 import com.lucas.banking.model.IdempotencyRecord;
 import com.lucas.banking.model.IdempotencyStatus;
 import com.lucas.banking.repository.IdempotencyRepository;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.stereotype.Service;
@@ -19,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.security.auth.login.AccountNotFoundException;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,7 +71,7 @@ public class PaymentService {
         BigDecimal amount = transferRequest.getAmount();
         if (sourceAccount.getBalance().compareTo(amount) < 0) {
             record.setStatus(IdempotencyStatus.FAILED);
-            idempotencyRepository.save(record);
+            idempotencyRepository.saveAndFlush(record);
             // Can create a custom exception
             throw new IllegalArgumentException("Insufficient funds");
         }
@@ -82,8 +81,7 @@ public class PaymentService {
         targetAccount.setBalance(targetAccount.getBalance().add(amount));
 
         // Save transfer
-        accountRepository.saveAndFlush(sourceAccount);
-        accountRepository.saveAndFlush(targetAccount);
+        accountRepository.saveAllAndFlush(List.of(sourceAccount, targetAccount));
 
         //Update Idempotency Record
         UUID transferId = UUID.randomUUID();
